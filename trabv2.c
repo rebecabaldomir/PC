@@ -44,7 +44,7 @@ void mostra_que_quer_entrar(){
   pthread_mutex_unlock(&mutex);
 }
 
-int servidor_trabalhar(int i){
+int servidor_trabalha(int i){
   //pthread_mutex_lock(&mutex);
   pthread_mutex_lock(&baia);
   int num_baia;
@@ -66,16 +66,17 @@ int servidor_trabalhar(int i){
     for (int k = 1; k <= linha_baia; k++)
     {
       matriz[k-1][i] = '_';
-      matriz[k][i] = 'S';
-      sleep(2);
+      matriz[k][i] = '0' + i;
+      sleep(1);
     }
-    //for (int k = i; k < coluna_baia; k++)
-    //{
-      //matriz[i][k] = 'S';
-      //sleep(2);
-    //}
+     for (int k = i; k < coluna_baia; k++)
+     {
+       matriz[linha_baia][k-1] = '_';
+       matriz[linha_baia][k] = '0' + i;
+       sleep(1);
+     }
   //pthread_mutex_unlock(&mutex);
-  sleep(5); 
+  sleep(20); 
   return num_baia;
 }
 
@@ -120,7 +121,7 @@ void* servidor(void * a){
 
     if(contador<=VAGAS){
 
-      int baia = servidor_trabalhar(i);
+      int baia = servidor_trabalha(i);
 
       servidor_vai_para_casa(i, baia);
 
@@ -183,7 +184,7 @@ void* imprime(){
       }
       printf("\n");
     }
-    sleep(3);
+    sleep(1);
     system("clear");
   }
 }
