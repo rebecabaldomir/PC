@@ -57,7 +57,7 @@ int servidor_trabalha(int i){
   }
   pthread_mutex_unlock(&baia);
 
-  printf("Servidor %d vai pegar a baia %d!\n", i, num_baia);
+  //printf("Servidor %d vai pegar a baia %d!\n", i, num_baia);
     
     int linha_baia = baias[num_baia][0];
     int coluna_baia = baias[num_baia][1];
@@ -82,7 +82,7 @@ int servidor_trabalha(int i){
 
 void servidor_vai_para_casa(int i, int num_baia){
   pthread_mutex_lock(&mutex);
-  printf("Servidor %d: vou deixar a baia %d.\n", i, num_baia);
+  //printf("Servidor %d: vou deixar a baia %d.\n", i, num_baia);
   pthread_mutex_lock(&baia);
   baias_ocupadas[num_baia] = 0;
   pthread_mutex_unlock(&baia);
@@ -147,11 +147,46 @@ void* estagiario(void* a){
       contador++;
       //printf("Estagiario %d trabalhando\n", i);
       pthread_mutex_unlock(&mutex);
-      sleep(5);
+
+      pthread_mutex_lock(&baia);
+      int num_baia;
+      for(int k = 0; k < 4; k++) {
+        if(baias_ocupadas[k] == 0){
+          baias_ocupadas[k] = 1;
+          num_baia = k;
+          break;
+        } 
+      }
+      pthread_mutex_unlock(&baia);
+
+        
+      int linha_baia = baias[num_baia][0];
+      int coluna_baia = baias[num_baia][1];
+      
+      
+      for (int k = 1; k <= linha_baia; k++)
+      {
+        matriz[k-1][i] = '_';
+        matriz[k][i] = '0' + i;
+        sleep(1);
+      }
+      for (int k = i; k < coluna_baia; k++)
+      {
+        matriz[linha_baia][k-1] = '_';
+        matriz[linha_baia][k] = '0' + i;
+        sleep(1);
+      }
+      sleep(20); 
+
       pthread_mutex_lock(&mutex);
       //printf("Estagiario %d saiu\n", i);
       contador--;
       pthread_mutex_unlock(&mutex);
+
+      pthread_mutex_lock(&baia);
+      baias_ocupadas[num_baia] = 0;
+      pthread_mutex_unlock(&baia);
+
       break;
     }
     pthread_mutex_lock(&mutex);
