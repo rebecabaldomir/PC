@@ -8,9 +8,6 @@
 #define N 20
 #define FALSE 0
 
-//SE CONTADOR-SERVIDOR == 0 LOCK(&VEZ)
-//LEITOR ESCRITOR
-
 int VAGAS = 4;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -41,18 +38,28 @@ void inicializa_baias(){
   baias[3][1] = 19;
 }
 
+void sai_da_baia(int num_baia, int i){
+  int linha = baias[num_baia][0];
+  int coluna = baias[num_baia][1];
+  matriz[linha][coluna - 1] = '_';
+  matriz[linha+1][coluna - 1] = '0' + i;
+  sleep(1);
+  matriz[linha+1][coluna - 1] = '_';
+  matriz[linha+1][coluna] = '0' + i;
+  sleep(1);
+  matriz[linha+1][coluna] = '_';
+}
+
 void mostra_que_quer_entrar(){
   pthread_mutex_lock(&mutex);
   contador++;
-  //printf("Somou contador: %d pelo Servidor %d \n",contador, i );
   pthread_mutex_unlock(&mutex);
 }
 
 int servidor_trabalha(int i){
-  //pthread_mutex_lock(&mutex);
   pthread_mutex_lock(&baia);
   int num_baia;
-  for(int k = 0; k < VAGAS; k++) {
+  for(int k = 0; k <= VAGAS; k++) {
     if(baias_ocupadas[k] == 0){
       baias_ocupadas[k] = 1;
       num_baia = k;
@@ -60,13 +67,8 @@ int servidor_trabalha(int i){
     } 
   }
   pthread_mutex_unlock(&baia);
-
-  printf("Servidor %d vai pegar a baia %d!\n", i, num_baia);
-    
     int linha_baia = baias[num_baia][0];
     int coluna_baia = baias[num_baia][1];
-    
-    printf("servidor: %d linha: %d coluna: %d\n", i, linha_baia, coluna_baia);
     for (int k = 1; k <= linha_baia; k++)
     {
       matriz[k-1][i] = '_';
@@ -79,71 +81,52 @@ int servidor_trabalha(int i){
        matriz[linha_baia][k] = '0' + i;
        sleep(1);
      }
-  //pthread_mutex_unlock(&mutex);
-  sleep(20); 
+  sleep(10); 
   return num_baia;
 }
 
 void servidor_vai_para_casa(int i, int num_baia){
   pthread_mutex_lock(&mutex);
-  //printf("Servidor %d: vou deixar a baia %d.\n", i, num_baia);
   pthread_mutex_lock(&baia);
   baias_ocupadas[num_baia] = 0;
   pthread_mutex_unlock(&baia);
-  //if(contador == VAGAS){
-    pthread_cond_broadcast(&lotou);
-    //printf("servidor %d enviou sinal\n", i);
- // }
+  pthread_cond_broadcast(&lotou);
   contador--;
   pthread_mutex_unlock(&mutex);
+  sai_da_baia(num_baia, i);
   sleep(5);
 }
 
 void servidor_fica_esperando(int i){
   pthread_mutex_lock(&mutex);
-  //printf("Lotado\n");
-  //printf("Servidor %d: vou esperar >:|\n", i);
   contador_servidores++;
   contador--;
   pthread_mutex_lock(&chefe_mutex);
   if(!chama_chefe){
     sleep(5);
-    printf("vou chamar o chefe\n");
     chama_chefe = 1;
     pthread_cond_signal(&acorda_chefe);
   }
   pthread_mutex_unlock(&chefe_mutex);
   while(contador >= VAGAS){
-    //printf("servidor %d esperando sinal\n", i);
     pthread_cond_wait(&lotou, &mutex);
-    //printf("servidor %d recebeu sinal\n", i);
   }
-  
   contador_servidores--;
-  //printf("sai do while\n");
   pthread_mutex_unlock(&mutex);
 }
 
 void* servidor(void * a){
   int i = *((int *) a);  
   while(1){
-
   matriz[1][i]='S';
   mostra_que_quer_entrar();
-
     if(contador<=VAGAS){
-
       int baia = servidor_trabalha(i);
-
       servidor_vai_para_casa(i, baia);
-
       break;
-
     }else{
-
       servidor_fica_esperando(i);
     }
-  
   }
 }
 
@@ -151,17 +134,13 @@ void* estagiario(void* a){
   int i = *((int *) a); 
   while(1){
     matriz[0][i]='E';
-   // pthread_mutex_lock(&vez);
-    //printf("sou estagiario contador: %d  contador servidor: %d\n", contador, contador_servidores);
     if(contador <= VAGAS && contador_servidores == 0){    
       pthread_mutex_lock(&mutex);
       contador++;
-      //printf("Estagiario %d trabalhando\n", i);
       pthread_mutex_unlock(&mutex);
-
       pthread_mutex_lock(&baia);
       int num_baia;
-      for(int k = 0; k < 4; k++) {
+      for(int k = 0; k <= VAGAS; k++) {
         if(baias_ocupadas[k] == 0){
           baias_ocupadas[k] = 1;
           num_baia = k;
@@ -169,63 +148,52 @@ void* estagiario(void* a){
         } 
       }
       pthread_mutex_unlock(&baia);
-
-        
       int linha_baia = baias[num_baia][0];
       int coluna_baia = baias[num_baia][1];
-      
-      
-      for (int k = 1; k <= linha_baia; k++)
-      {
+      for (int k = 1; k <= linha_baia; k++){
         matriz[k-1][i] = '_';
         matriz[k][i] = '0' + i;
         sleep(1);
       }
-      for (int k = i; k < coluna_baia; k++)
-      {
+      for (int k = i; k < coluna_baia; k++){
         matriz[linha_baia][k-1] = '_';
         matriz[linha_baia][k] = '0' + i;
         sleep(1);
       }
       sleep(20); 
-
       pthread_mutex_lock(&mutex);
-      //printf("Estagiario %d saiu\n", i);
       contador--;
       pthread_mutex_unlock(&mutex);
-
       pthread_mutex_lock(&baia);
       baias_ocupadas[num_baia] = 0;
       pthread_mutex_unlock(&baia);
-
+      sai_da_baia(num_baia, i);
       break;
     }
     pthread_mutex_lock(&mutex);
     while(contador >= VAGAS || contador_servidores > 0){
-      //printf("estagiario %d vai esperar\n", i);
       pthread_cond_wait(&lotou, &mutex);
     }
     pthread_mutex_unlock(&mutex);
-    //pthread_mutex_unlock(&vez);
   }
 }
 
-void* chefe_vai_ao_almoxarifado(){
-  //vai no almoxarifado fazer o pedido de mais uma baia quando acabam as vagas
+void* chefe_vai_ao_almoxarifado(void* a){
+  int i = *((int *) a); 
+  matriz[i][15] = 'C';
   pthread_mutex_lock(&chefe_mutex);
-  printf("chefe nasceu %d", chama_chefe);
   while(!chama_chefe){
-    printf("vou esperar\n");
     pthread_cond_wait(&acorda_chefe, &chefe_mutex);
   }
-  printf("recebi sinal\n");
   pthread_mutex_unlock(&chefe_mutex);
+  sleep(10);
   pthread_mutex_lock(&baia);
   matriz[17][19] = 'B';
   baias[4][0] = 17;
   baias[4][1] = 19;
   baias_ocupadas[5] = 0;
   VAGAS++;
+  pthread_cond_broadcast(&lotou);
   pthread_mutex_unlock(&baia);
 }
 
@@ -249,15 +217,15 @@ void* imprime(){
       }
       printf("\n");
     }
-    sleep(2);
+    sleep(1);
     system("clear");
   }
 }
 
 int main(){
 
-  pthread_t s[SERVIDORES];
-  pthread_t e[ESTAGIARIOS];
+  pthread_t s[100];
+  pthread_t e[100];
   pthread_t matriz;
   pthread_t chefe;
   int i;
@@ -265,10 +233,13 @@ int main(){
   preenche_matriz();
   inicializa_baias();
 
-
   id = (int *) malloc(sizeof(int));
   *id = i;
   pthread_create(&chefe, NULL, chefe_vai_ao_almoxarifado, (void *) (id));
+
+  id = (int *) malloc(sizeof(int));
+  *id = i;
+  pthread_create(&matriz, NULL, imprime, (void *) (id));
 
   for (i = 0; i < SERVIDORES ; i++) {
     id = (int *) malloc(sizeof(int));
@@ -282,10 +253,23 @@ int main(){
     pthread_create(&e[i], NULL, estagiario, (void *) (id));
   }
 
-  
-  id = (int *) malloc(sizeof(int));
-  *id = i;
-  pthread_create(&matriz, NULL, imprime, (void *) (id));
+  int num_threads = SERVIDORES;
+  while(1){
+  time_t t;
+  srand((unsigned) time(&t));      
+  int random = rand() % 2;
+    if(random == 0){
+      id = (int *) malloc(sizeof(int));
+      *id = num_threads;
+      pthread_create(&s[num_threads], NULL, servidor, (void *) (id));
+    }else{
+      id = (int *) malloc(sizeof(int));
+      *id = num_threads;
+      pthread_create(&e[num_threads], NULL, estagiario, (void *) (id));
+    }
+    num_threads++;
+    sleep(30);
+  }
 
   for (i = 0; i < SERVIDORES ; i++) {
     pthread_join(s[i],NULL);
